@@ -15,43 +15,41 @@ pipeline {
     stage('Build and Test') {
       steps {
         sh 'ls -ltr'
-        sh 'mvn clean package -DskipTests'
+       sh 'mvn clean package -DskipTests'
       }
     }
+ stage('Build and Push Docker Image') {
+      steps {
+        script {
+          sh "docker build -t ${IMAGE_NAME} ."
+        }
+      }
+    }
+     stage('Push to DockerHub') {
+  steps {
+    withCredentials([usernamePassword(credentialsId: 'docker_cre', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+      sh """
+        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        docker push meghanahs/case1
+      """
+     }
+    }
+  }
 
-  //   stage('Build and Push Docker Image') {
-  //     steps {
-  //       script {
-  //         sh "docker build -t ${IMAGE_NAME} ."
-  //       }
-  //     }
-  //   }
-
-  //   stage('Push to DockerHub') {
-  //     steps {
-  //       withCredentials([usernamePassword(credentialsId: 'DOCKERHUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-  //         sh '''
-  //           echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-  //           docker push $IMAGE_NAME
-  //         '''
-  //       }
-  //     }
-  //   }
-
-  //   stage('Static Code Analysis') {
-  //     environment {
-  //       SONAR_URL = "http://13.127.80.68:9000/"
-  //     }
-  //     steps {
-  //       withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
-  //         sh """
-  //           mvn sonar:sonar \
-  //             -Dsonar.login=$SONAR_AUTH_TOKEN \
-  //             -Dsonar.host.url=$SONAR_URL
-  //         """
-  //       }
-  //     }
-  //   }
+    stage('Static Code Analysis') {
+      environment {
+        SONAR_URL = "http://13.233.148.193:9000/"
+      }
+      steps {
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
+          sh """
+            mvn sonar:sonar \
+              -Dsonar.login=$SONAR_AUTH_TOKEN \
+              -Dsonar.host.url=$SONAR_URL
+          """
+        }
+      }
+    }
 
   //   stage('Deploy to Dev') {
   //     steps {
