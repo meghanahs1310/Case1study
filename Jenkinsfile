@@ -34,23 +34,28 @@ pipeline {
       """
      }
     }
+}
+stage('Static Code Analysis') {
+  environment {
+    SONAR_URL = "http://13.200.242.209:9000"
   }
+  steps {
+    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
+      sh '''
+        echo "Waiting for SonarQube to be ready..."
+        until curl -s $SONAR_URL/api/system/status | grep -q '"status":"UP"'; do
+          echo "SonarQube is not ready yet. Waiting 5 seconds..."
+          sleep 5
+        done
 
-    stage('Static Code Analysis') {
-      environment {
-        SONAR_URL = "http://13.233.148.193:9000/"
-      }
-      steps {
-        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
-          sh """
-            mvn sonar:sonar \
-              -Dsonar.login=$SONAR_AUTH_TOKEN \
-              -Dsonar.host.url=$SONAR_URL
-          """
-        }
-      }
+        echo "SonarQube is UP. Starting analysis..."
+        mvn sonar:sonar \
+          -Dsonar.login=$SONAR_AUTH_TOKEN \
+          -Dsonar.host.url=$SONAR_URL
+      '''
     }
-
+  }
+}
   //   stage('Deploy to Dev') {
   //     steps {
   //       script {
