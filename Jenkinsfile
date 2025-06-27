@@ -108,14 +108,14 @@ stage('Static Code Analysis') {
   // post {
   //   success {
   //     echo 'Deployment successful!'
-  //     mail to: 'bhavanijd51@gmail.com',
+  //     mail to: 'meghana.hs1400@gmail.com',
   //          subject: "Jenkins Pipeline Success: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
   //          body: "Good news! Jenkins job '${env.JOB_NAME}' (build #${env.BUILD_NUMBER}) completed successfully.\n\nCheck details: ${env.BUILD_URL}"
   //   }
 
   //   failure {
   //     echo 'Deployment failed!'
-  //     mail to: 'bhavanijd51@gmail.com',
+  //     mail to: 'meghana.hs1400@gmail.com',
   //          subject: "Jenkins Pipeline Failure: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
   //          body: "Oops! Jenkins job '${env.JOB_NAME}' (build #${env.BUILD_NUMBER}) failed.\n\nCheck details: ${env.BUILD_URL}"
   //   }
