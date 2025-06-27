@@ -56,15 +56,15 @@ stage('Static Code Analysis') {
     }
   }
 }
-  //   stage('Deploy to Dev') {
-  //     steps {
-  //       script {
-  //         sh """
-  //           kubectl apply -f ${MANIFEST_PATH}/dev/deployment.yaml --namespace=dev
-  //         """
-  //       }
-  //     }
-  //   }
+    stage('Deploy to Dev') {
+      steps {
+        script {
+          sh """
+            kubectl apply -f ${MANIFEST_PATH}/dev/deployment.yaml --namespace=dev
+          """
+        }
+      }
+    }
 
   //   stage('Deploy to Test') {
   //     steps {
