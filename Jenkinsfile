@@ -1,8 +1,11 @@
+
 pipeline {
   agent any
+
   environment {
     IMAGE_NAME = "meghanahs/case1"
     MANIFEST_PATH = "manifest_file/k8s"
+    KUBECONFIG = credentials('kubeconfig-file')
   }
 
   stages {
@@ -15,109 +18,91 @@ pipeline {
     stage('Build and Test') {
       steps {
         sh 'ls -ltr'
-       sh 'mvn clean package -DskipTests'
+        sh 'mvn clean package -DskipTests'
       }
     }
- stage('Build and Push Docker Image') {
-      steps {
-        script {
-          sh "docker build -t ${IMAGE_NAME} ."
-        }
-      }
-    }
-     stage('Push to DockerHub') {
-  steps {
-    withCredentials([usernamePassword(credentialsId: 'docker_cre', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-      sh """
-        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-        docker push meghanahs/case1
-      """
-     }
-    }
-}
-stage('Static Code Analysis') {
-  environment {
-    SONAR_URL = "http://13.200.242.209:9000"
-  }
-  steps {
-    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
-      sh '''
-        echo "Waiting for SonarQube to be ready..."
-        until curl -s $SONAR_URL/api/system/status | grep -q '"status":"UP"'; do
-          echo "SonarQube is not ready yet. Waiting 5 seconds..."
-          sleep 5
-        done
 
-        echo "SonarQube is UP. Starting analysis..."
-        mvn sonar:sonar \
-          -Dsonar.login=$SONAR_AUTH_TOKEN \
-          -Dsonar.host.url=$SONAR_URL
-      '''
-    }
-  }
-}
-    stage('Deploy to Dev') {
+    stage('Build Docker Image') {
       steps {
-        script {
+        sh "docker build -t ${IMAGE_NAME} ."
+      }
+    }
+
+    stage('Push to DockerHub') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'docker_cre', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
           sh """
-            kubectl apply -f ${MANIFEST_PATH}/dev/deployment.yaml --namespace=dev
+            echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+            docker push ${IMAGE_NAME}
           """
         }
       }
     }
 
-  //   stage('Deploy to Test') {
-  //     steps {
-  //       script {
-  //         sh """
-  //           kubectl apply -f ${MANIFEST_PATH}/test/deployment.yaml --namespace=test
-  //           kubectl rollout status deployment/case1 --namespace=test
-  //         """
-  //       }
-  //     }
-  //   }
+     stage('Static Code Analysis') {
+       environment {
+         SONAR_URL = "http://65.2.172.71:9000"
+       }
+       steps {
+         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_AUTH_TOKEN')]) {
+           sh '''
+             echo "Waiting for SonarQube to be ready..."
+             until curl -s $SONAR_URL/api/system/status | grep -q '"status":"UP"'; do
+               echo "SonarQube is not ready yet. Waiting 5 seconds..."
+               sleep 5
+             done
 
-  //   stage('Approval to Deploy to Prod') {
-  //     steps {
-  //       script {
-  //         input(
-  //           message: "Approve deployment to Prod?", 
-  //           parameters: [
-  //             booleanParam(name: 'Proceed', defaultValue: false, description: 'Approve the deployment to Prod')
-  //           ]
-  //         )
-  //       }
-  //     }
-  //   }
+             echo "SonarQube is UP. Starting analysis..."
+             mvn sonar:sonar \
+               -Dsonar.login=$SONAR_AUTH_TOKEN \
+               -Dsonar.host.url=$SONAR_URL
+          '''
+         }
+    }
+     }
+    
+    stage('Deploy to Dev') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'aws-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh 'kubectl apply -f ${MANIFEST_PATH}/dev/deployment.yaml --namespace=dev'
+        }
+      }
+    }
 
-  //   stage('Deploy to Prod') {
-  //     when {
-  //       expression { return params.Proceed == true }
-  //     }
-  //     steps {
-  //       script {
-  //         sh """
-  //           kubectl apply -f ${MANIFEST_PATH}/prod/deployment.yaml --namespace=prod
-  //           kubectl rollout status deployment/case1 --namespace=prod
-  //         """
-  //       }
-  //     }
-  //   }
-  // }
+    stage('Deploy to Test') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'aws-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh 'kubectl apply -f ${MANIFEST_PATH}/dev/deployment.yaml --namespace=test'
+        }
+      }
+    }
 
-  // post {
-  //   success {
-  //     echo 'Deployment successful!'
-  //     mail to: 'meghana.hs1400@gmail.com',
-  //          subject: "Jenkins Pipeline Success: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-  //          body: "Good news! Jenkins job '${env.JOB_NAME}' (build #${env.BUILD_NUMBER}) completed successfully.\n\nCheck details: ${env.BUILD_URL}"
-  //   }
+       stage('Approval to Deploy to Prod') {
+      steps {
+        script {
+          def userInput = input(
+            message: "Approve deployment to Prod?",
+            parameters: [
+              booleanParam(name: 'Proceed', defaultValue: false, description: 'Approve the deployment to Prod')
+            ]
+          )
+          // Save to environment so it can be used in next stage
+          env.PROCEED_TO_PROD = userInput.toString()
+        }
+      }
+    }
 
-  //   failure {
-  //     echo 'Deployment failed!'
-  //     mail to: 'meghana.hs1400@gmail.com',
-  //          subject: "Jenkins Pipeline Failure: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-  //          body: "Oops! Jenkins job '${env.JOB_NAME}' (build #${env.BUILD_NUMBER}) failed.\n\nCheck details: ${env.BUILD_URL}"
-  //   }
+    stage('Deploy to Prod') {
+      when {
+        expression {
+          return env.PROCEED_TO_PROD == 'true'
+        }
+      }
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'aws-creds', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+          sh 'kubectl apply -f ${MANIFEST_PATH}/dev/deployment.yaml --namespace=prod'
+        }
+      }
+    }
   }
 }
